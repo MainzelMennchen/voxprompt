@@ -1,0 +1,67 @@
+# voxprompt — Konfiguration
+# Wird von app.py beim Start geladen. Alle Felder sind bewusst zentral hier,
+# damit Modelle, Endpoint und Hotkeys ohne Code-Änderung umstellbar sind.
+
+[transcription]
+# Whisper-Modell für mlx-whisper. Wird beim ersten Lauf automatisch von
+# Hugging Face geladen.
+whisper_model = "mlx-community/whisper-large-v3-mlx"
+# Matrix-/Primärsprache. Deutsch wird erzwungen; englische Fachbegriffe
+# bereinigt später das LLM (Modus 2/3).
+primary_language = "de"
+
+[llm]
+# Backend: "endpoint" (HTTP gegen lokalen MLX-Server, für die Entwicklung) oder
+# "inprocess" (lädt das Modell über mlx_lm direkt in den Prozess, ohne Server —
+# für die verteilbare App).
+llm_backend = "endpoint"
+# OpenAI-kompatibler Chat-Completions-Endpoint (nur für llm_backend="endpoint").
+# Aktuell: LM Studio.
+llm_endpoint = "http://127.0.0.1:1234/v1"
+# Muss dem im Server geladenen Modellnamen entsprechen (siehe GET /v1/models).
+llm_model = "qwen3.6-35b-a3b-mtp"
+# Optionaler API-Key (für lokale Server meist leer). Leerstring = kein Key.
+api_key = ""
+# Timeout für LLM-Anfragen in Sekunden.
+timeout_seconds = 120
+# Max. Tokens der Antwort. Bei Reasoning-Modellen großzügig wählen.
+max_tokens = 2000
+# Thinking/Reasoning abschalten (Qwen3.x denken sonst das ganze Token-Budget weg
+# und liefern leeren Text). Sendet chat_template_kwargs.enable_thinking=false.
+disable_thinking = true
+# LLM-Server automatisch mit der App starten/stoppen. AUS: LM Studio hostet den
+# Server selbst, voxprompt soll ihn nicht starten/beenden.
+manage_server = false
+# Startbefehl; {host}/{port} werden aus llm_endpoint ersetzt. mlx_lm.server läuft
+# ohne --model und lädt das in der Anfrage angeforderte Modell dynamisch.
+server_command = ["/Users/erik/.local/bin/mlx_lm.server", "--host", "{host}", "--port", "{port}"]
+# Sekunden, die auf das Hochfahren des Servers gewartet wird.
+server_startup_timeout = 30
+
+[modes]
+# Standardmodus beim Start: "raw" | "cleanup" | "prompt"
+default_mode = "cleanup"
+
+[hotkeys]
+# Push-to-Talk: eine einzelne dedizierte Taste (kein Akkord -> robuster).
+# Default: rechte Wahltaste (right option). Halten = Aufnahme, Loslassen = Stop.
+push_to_talk = "<alt_r>"
+# Verhalten der Push-to-Talk-Taste: "hold" (halten/loslassen) oder "toggle"
+# (einmal drücken startet, nochmal drücken stoppt — Fallback, falls Hold flakey).
+push_to_talk_mode = "hold"
+# Direkt-in-Modus-aufnehmen Hotkeys (Schritt 6).
+mode_raw = "<cmd>+<shift>+1"
+mode_cleanup = "<cmd>+<shift>+2"
+mode_prompt = "<cmd>+<shift>+3"
+
+[audio]
+# Sprachaktivitätserkennung (VAD) vor der Transkription, gegen Geistertext bei Stille.
+# Aggressivität 0..3 (höher = strenger filtern). Mindest-Sprachdauer in ms, sonst
+# wird die Aufnahme als leer verworfen.
+vad_aggressiveness = 2
+min_speech_ms = 200
+
+[output]
+# Wenn true: Ergebnis zusätzlich per simuliertem Cmd+V einfügen (Schritt 7).
+# Braucht die macOS-Berechtigung "Bedienungshilfen".
+auto_paste = false

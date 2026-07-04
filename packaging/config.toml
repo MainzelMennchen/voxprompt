@@ -1,0 +1,35 @@
+# voxprompt — Konfiguration für das verteilte .app-Bundle.
+# Unterschied zur Dev-config.toml: In-Process-Backend (kein externer Server).
+# Wird von build_app.sh/setup.py als config.toml ins Bundle (Resources) gelegt.
+
+[transcription]
+whisper_model = "mlx-community/whisper-large-v3-mlx"
+primary_language = "de"
+
+[llm]
+# Bundle: Modell direkt im Prozess laden, ohne Server.
+llm_backend = "inprocess"
+llm_model = "mlx-community/Qwen3.5-9B-MLX-4bit"
+api_key = ""
+timeout_seconds = 120
+max_tokens = 2000
+disable_thinking = true
+# Kein Server-Management im Bundle (es gibt keinen externen Server).
+manage_server = false
+
+[modes]
+default_mode = "cleanup"
+
+[hotkeys]
+push_to_talk = "<alt_r>"
+push_to_talk_mode = "hold"
+mode_raw = "<cmd>+<shift>+1"
+mode_cleanup = "<cmd>+<shift>+2"
+mode_prompt = "<cmd>+<shift>+3"
+
+[audio]
+vad_aggressiveness = 2
+min_speech_ms = 200
+
+[output]
+auto_paste = false

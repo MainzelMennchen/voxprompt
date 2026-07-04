@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- macOS LaunchAgent für voxprompt (Schritt 8).
+     BEWUSST ein LaunchAgent, KEIN system LaunchDaemon: eine Menüleisten-App mit
+     globalen Hotkeys braucht die eingeloggte Aqua/GUI-Session des Users.
+     Installieren: nach ~/Library/LaunchAgents/com.erik.voxprompt.plist kopieren
+     und mit `launchctl` laden (siehe README). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.erik.voxprompt</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/erik/.local/bin/uv</string>
+        <string>run</string>
+        <string>--directory</string>
+        <string>/Users/erik/dev/voxprompt</string>
+        <string>voxprompt</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/erik/dev/voxprompt</string>
+
+    <!-- launchd startet mit minimalem PATH; uv und seine Subprozesse brauchen einen
+         sinnvollen Suchpfad. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/erik/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Beim Laden (= beim Login) automatisch starten ... -->
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- ... und am Leben halten (Neustart nach Absturz oder Beenden). -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/voxprompt.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/voxprompt.err.log</string>
+</dict>
+</plist>

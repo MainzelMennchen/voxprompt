@@ -1,0 +1,44 @@
+[project]
+name = "voxprompt"
+version = "0.1.0"
+description = "Lokales Push-to-Talk-Diktiertool für macOS: mlx-whisper STT + lokale LLM-Nachbearbeitung in drei Modi."
+readme = "README.md"
+requires-python = ">=3.12"
+
+# Schrittweiser Aufbau: vorerst nur das, was zum Starten der Menüleisten-App nötig ist.
+# Weitere Abhängigkeiten kommen in ihren jeweiligen Bauschritten dazu (siehe CLAUDE.md):
+#   Schritt 2: sounddevice, soundfile, pynput
+#   Schritt 3: mlx-whisper, pyperclip
+#   Schritt 4: httpx
+#   Schritt 7: webrtcvad (optional)
+dependencies = [
+    "httpx>=0.28.1",
+    "mlx-lm>=0.31.3",
+    "mlx-whisper>=0.4.3",
+    "numpy>=1.26,<2.2",
+    "pynput>=1.8.2",
+    "pyobjc-framework-servicemanagement>=12.2.1",
+    "pyperclip>=1.11.0",
+    "rumps>=0.4.0",
+    "sounddevice>=0.5.5",
+    "soundfile>=0.14.0",
+    "webrtcvad-wheels>=2.0.14",
+]
+
+[project.scripts]
+voxprompt = "voxprompt.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voxprompt"]
+
+[dependency-groups]
+dev = [
+    "pillow>=12.2.0",
+    "py2app>=0.28.10",
+    "pytest>=9.1.1",
+    "setuptools<80",
+]
