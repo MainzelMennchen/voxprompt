@@ -1,14 +1,14 @@
 # voxprompt
 
-**Deutsch** · [English](README.en.md)
+**English** · [Deutsch](README.de.md)
 
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black.svg)](https://www.apple.com/macos/)
 
-Lokales Push-to-Talk-Diktiertool für macOS. Deutsch-primär mit englischem
-Code-Switching: lokale Spracherkennung (mlx-whisper) und lokale LLM-Nachbearbeitung
-in drei Modi: Roh, Bereinigt, Prompt-optimiert.
+Local push-to-talk dictation tool for macOS. German-primary with English
+code-switching: local speech recognition (mlx-whisper) and local LLM post-processing
+in three modes: Raw, Cleaned, Prompt-optimized.
 
 ## Start
 
@@ -16,192 +16,192 @@ in drei Modi: Roh, Bereinigt, Prompt-optimiert.
 uv run voxprompt
 ```
 
-Es erscheint ein 🎙-Icon in der Menüleiste; über **Quit** lässt es sich beenden.
+A 🎙 icon appears in the menu bar; use **Quit** to exit.
 
-## Push-to-Talk
+## Push-to-talk
 
-Standard-Taste: **rechte Wahltaste (right ⌥ / `<alt_r>`)**. Halten zum Aufnehmen,
-loslassen zum Stoppen. Das Icon zeigt den Status: 🎙 bereit · 🔴 Aufnahme · 💭 transkribiert.
-Taste und Verhalten (`hold`/`toggle`) sind in [config.toml](config.toml) unter `[hotkeys]`
-einstellbar.
+Default key: **right option key (right ⌥ / `<alt_r>`)**. Hold to record,
+release to stop. The icon shows the status: 🎙 ready · 🔴 recording · 💭 transcribing.
+Key and behavior (`hold`/`toggle`) are configurable in [config.toml](config.toml) under
+`[hotkeys]`.
 
-Nach dem Loslassen wird die Aufnahme transkribiert (mlx-whisper, Deutsch erzwungen), je nach
-Modus nachbearbeitet und das Ergebnis **in die Zwischenablage** gelegt; eine Notification
-meldet „Text bereit". Danach mit ⌘V einfügen (oder per Auto-Paste, s. u.).
+After releasing, the recording is transcribed (mlx-whisper, German enforced), post-processed
+depending on the mode, and the result is placed **on the clipboard**; a notification says
+"Text ready". Then paste it with ⌘V (or via auto-paste, see below).
 
-> Beim **ersten** Lauf lädt mlx-whisper das Modell `whisper-large-v3-mlx` (~3 GB) von
-> Hugging Face. Das dauert einmalig ein paar Minuten, danach ist es gecacht. Ein
-> kleineres/schnelleres Modell lässt sich in [config.toml](config.toml) (`whisper_model`)
-> setzen, z. B. `mlx-community/whisper-tiny-mlx` zum schnellen Ausprobieren.
+> On the **first** run, mlx-whisper downloads the `whisper-large-v3-mlx` model (~3 GB) from
+> Hugging Face. This takes a few minutes once, after which it is cached. A
+> smaller/faster model can be set in [config.toml](config.toml) (`whisper_model`),
+> e.g. `mlx-community/whisper-tiny-mlx` for a quick try.
 
-### macOS-Berechtigungen (nötig, sonst tut sich nichts)
+### macOS permissions (required, otherwise nothing happens)
 
-Beim ersten Lauf fragt macOS nicht immer von selbst. Erteile die Rechte manuell unter
-*Systemeinstellungen → Datenschutz & Sicherheit*:
+On the first run macOS does not always ask by itself. Grant the permissions manually under
+*System Settings → Privacy & Security*:
 
-- **Eingabeüberwachung (Input Monitoring):** für die globale Push-to-Talk-Taste (pynput).
-  Ohne diese Freigabe meldet die Konsole „This process is not trusted!" und die Taste
-  feuert nicht.
-- **Mikrofon:** für die Aufnahme (sonst nimmt die App nur Stille auf).
-- **Bedienungshilfen (Accessibility):** für das optionale Auto-Paste (⌘V simulieren).
+- **Input Monitoring:** for the global push-to-talk key (pynput).
+  Without this, the console reports "This process is not trusted!" and the key
+  does not fire.
+- **Microphone:** for recording (otherwise the app only records silence).
+- **Accessibility:** for the optional auto-paste (simulating ⌘V).
 
-Freigeben musst du die App, von der aus gestartet wird (im Dev-Betrieb: dein Terminal;
-als Dienst: siehe Hinweis unter „Als Dienst starten"). Nach dem Erteilen die App neu starten.
+You must grant these to the app that starts it (in dev: your terminal;
+as a service: see the note under "Run as a service"). Restart the app after granting.
 
-## Als .app bauen (py2app)
-
-```bash
-./scripts/build_app.sh        # -> dist/voxprompt.app (~600 MB, ohne Modelle)
-```
-
-Die `.app` ist eigenständig (eigenes Python + alle nativen MLX-Libs) und braucht weder ein
-uv-Environment noch einen laufenden Server; sie nutzt das `inprocess`-Backend. Modelle lädt
-sie beim ersten Start. Doppelklick startet die Menüleisten-App; das Signieren für die
-Weitergabe an andere Macs kommt zum Schluss (siehe Phase-2-Plan, Schritt 7/8).
-
-### Verteilbares DMG
+## Build the .app (py2app)
 
 ```bash
-brew install create-dmg     # einmalig
-./scripts/make_dmg.sh        # -> dist/voxprompt.dmg (Drag-to-Applications)
+./scripts/build_app.sh        # -> dist/voxprompt.app (~600 MB, without models)
 ```
 
-DMG öffnen, **voxprompt.app in den Programme-Ordner ziehen**, fertig. (Hinweis: create-dmg
-fährt für das Fensterlayout den Finder per AppleScript; bei einem `AppleEvent timed out`
-einfach das Skript erneut laufen lassen.)
+The `.app` is self-contained (its own Python + all native MLX libs) and needs neither a
+uv environment nor a running server; it uses the `inprocess` backend. It downloads models
+on first launch. A double-click starts the menu bar app; signing for
+distribution to other Macs comes last (see the Phase 2 plan, step 7/8).
 
-## App-Icon austauschen
-
-Das mitgelieferte `assets/icon.png` ist nur ein **Platzhalter**. Eigenes Icon (1024×1024 PNG)
-einfach unter `assets/icon.png` ablegen und neu generieren:
+### Distributable DMG
 
 ```bash
-./scripts/make_icons.sh   # baut assets/voxprompt.icns + Menüleisten-Template neu
+brew install create-dmg     # once
+./scripts/make_dmg.sh        # -> dist/voxprompt.dmg (drag-to-Applications)
 ```
 
-Das Menüleisten-Icon ist ein monochromes **Template** (passt sich an helle/dunkle Menüleiste
-an); das App-Icon (`.icns`) landet später im `.app`-Bundle.
+Open the DMG, **drag voxprompt.app into the Applications folder**, done. (Note: create-dmg
+drives the Finder via AppleScript for the window layout; on an `AppleEvent timed out`
+just run the script again.)
 
-## Erster Start: Modelle laden
+## Replace the app icon
 
-Beim allerersten Start lädt voxprompt die benötigten Modelle (Spracherkennung, bei
-`inprocess` zusätzlich das Sprachmodell; mehrere GB) von Hugging Face. Ein Hinweisfenster
-erklärt das, der Fortschritt erscheint als `⬇ %` im Menüleisten-Icon, danach meldet eine
-Notification „Modelle bereit". Der App-Start selbst bleibt schnell: die Modelle werden
-**lazy** beim ersten Diktat in den Speicher geladen und dort gehalten. Sind die Modelle
-schon im HF-Cache, entfällt der Download.
+The bundled `assets/icon.png` is only a **placeholder**. Just put your own icon (1024×1024 PNG)
+at `assets/icon.png` and regenerate:
 
-## LLM-Backend: endpoint vs. inprocess
+```bash
+./scripts/make_icons.sh   # rebuilds assets/voxprompt.icns + menu bar template
+```
+
+The menu bar icon is a monochrome **template** (adapts to a light/dark menu bar);
+the app icon (`.icns`) later goes into the `.app` bundle.
+
+## First launch: downloading models
+
+On the very first launch, voxprompt downloads the required models (speech recognition, plus
+the language model with `inprocess`; several GB) from Hugging Face. A dialog
+explains this, progress appears as `⬇ %` in the menu bar icon, and afterwards a
+notification says "Models ready". The app launch itself stays fast: the models are loaded
+**lazily** into memory on the first dictation and kept there. If the models are
+already in the HF cache, the download is skipped.
+
+## LLM backend: endpoint vs. inprocess
 
 `[llm] llm_backend` in [config.toml](config.toml):
-- **`endpoint`** (Default, Entwicklung): HTTP gegen einen lokalen MLX-Server
-  (`llm_endpoint`). Kann den Server automatisch mitstarten (s. u.).
-- **`inprocess`** (für die verteilbare App): lädt das Modell über `mlx_lm` direkt in den
-  Prozess. **Kein Server, kein Port** nötig. Das Modell wird beim ersten Gebrauch geladen
-  und für die Sitzung gehalten.
+- **`endpoint`** (default, development): HTTP against a local MLX server
+  (`llm_endpoint`). Can start the server automatically (see below).
+- **`inprocess`** (for the distributable app): loads the model via `mlx_lm` directly into the
+  process. **No server, no port** needed. The model is loaded on first use
+  and kept for the session.
 
-Beide liefern identische Ergebnisse; der Rest der App merkt nichts vom Backend.
+Both produce identical results; the rest of the app is unaware of the backend.
 
-## LLM-Server automatisch starten/stoppen
+## Start/stop the LLM server automatically
 
-Mit `[llm] manage_server = true` (Default) fährt voxprompt beim Start den lokalen
-LLM-Server selbst hoch und beim Beenden wieder herunter (das geladene Modell wird dabei
-entladen). Der Startbefehl steht in `[llm] server_command` ({host}/{port} kommen aus
-`llm_endpoint`). Läuft beim Start bereits ein Server unter `llm_endpoint` (z. B. manuell
-gestartet), wird er **übernommen und beim Beenden nicht** gestoppt.
+With `[llm] manage_server = true` (default), voxprompt starts the local
+LLM server itself on launch and shuts it down again on exit (the loaded model is
+unloaded in the process). The start command is in `[llm] server_command` ({host}/{port} come
+from `llm_endpoint`). If a server is already running at `llm_endpoint` on launch (e.g. started
+manually), it is **adopted and not** stopped on exit.
 
-So genügt:
+So this is enough:
 
 ```bash
-uv run voxprompt          # startet auch den mlx_lm.server
-# … diktieren …
-# Quit im Menü (oder Strg-C / Prozess beenden) -> Server wird gestoppt, Modell entladen
+uv run voxprompt          # also starts the mlx_lm.server
+# … dictate …
+# Quit in the menu (or Ctrl-C / kill the process) -> server is stopped, model unloaded
 ```
 
-Server-Log: `/tmp/voxprompt-mlx.log`.
+Server log: `/tmp/voxprompt-mlx.log`.
 
-> Hinweis: Wer voxprompt als immer laufenden **LaunchAgent** betreibt (s. u.), hat den
-> Server faktisch dauerhaft an (KeepAlive startet die App nach Quit neu). Das automatische
-> Stoppen beim Beenden greift v. a. im Standalone-Betrieb (`uv run voxprompt`). Für reinen
-> On-Demand-Betrieb den LaunchAgent entladen.
+> Note: If you run voxprompt as an always-on **LaunchAgent** (see below), the
+> server is effectively always on (KeepAlive restarts the app after Quit). The automatic
+> stop on exit mainly matters in standalone operation (`uv run voxprompt`). For pure
+> on-demand operation, unload the LaunchAgent.
 
-## Als Dienst starten (LaunchAgent, Autostart beim Login)
+## Run as a service (LaunchAgent, autostart at login)
 
-voxprompt läuft als **LaunchAgent** (nicht als system LaunchDaemon; eine Menüleisten-App
-mit globalen Hotkeys braucht die eingeloggte GUI-Session). Damit startet es automatisch beim
-Login, wird nach Absturz/Beenden neu gestartet und übersteht Ab-/Anmelden und Reboot.
+voxprompt runs as a **LaunchAgent** (not as a system LaunchDaemon; a menu bar app
+with global hotkeys needs the logged-in GUI session). This way it starts automatically at
+login, is restarted after a crash/exit, and survives logout/login and reboot.
 
 ```bash
-# 1) plist in den LaunchAgents-Ordner kopieren
+# 1) copy the plist into the LaunchAgents folder
 cp ~/dev/voxprompt/scripts/com.erik.voxprompt.plist ~/Library/LaunchAgents/
 
-# 2) laden (startet die App sofort; RunAtLoad=true)
+# 2) load it (starts the app immediately; RunAtLoad=true)
 launchctl load ~/Library/LaunchAgents/com.erik.voxprompt.plist
 
-# Status / Logs
+# status / logs
 launchctl list | grep voxprompt
-tail -f /tmp/voxprompt.err.log   # u. a. die pynput-Berechtigungsmeldung
+tail -f /tmp/voxprompt.err.log   # incl. the pynput permission message
 
-# Stoppen / entladen (nötig, weil KeepAlive es sonst neu startet)
+# stop / unload (needed, because KeepAlive otherwise restarts it)
 launchctl unload ~/Library/LaunchAgents/com.erik.voxprompt.plist
 
-# Nach einer plist-Änderung: erst unload, dann load
+# After a plist change: first unload, then load
 ```
 
-**Wichtig, Berechtigungen für den Dienst:** Mikrofon, Eingabeüberwachung und (für
-Auto-Paste) Bedienungshilfen müssen dem Prozess erteilt werden, der jetzt startet; das ist
-nicht mehr dein Terminal, sondern der über launchd gestartete Python-Prozess
-(`…/voxprompt/.venv/bin/python3`). macOS fragt beim ersten Tastendruck/ersten Mikrofonzugriff;
-falls nicht, die Einträge unter *Systemeinstellungen → Datenschutz & Sicherheit* manuell
-hinzufügen (Liste über „+" und den Python-Pfad). Nach dem Erteilen einmal
-`launchctl unload`/`load`.
+**Important, permissions for the service:** Microphone, Input Monitoring and (for
+auto-paste) Accessibility must be granted to the process that now starts; that is
+no longer your terminal, but the Python process started via launchd
+(`…/voxprompt/.venv/bin/python3`). macOS asks on the first keypress/first microphone access;
+if not, add the entries manually under *System Settings → Privacy & Security*
+(list via "+" and the Python path). After granting, run
+`launchctl unload`/`load` once.
 
-> KeepAlive=true heißt: „Quit" im Menü startet den Dienst sofort neu. Zum echten Beenden
-> `launchctl unload` benutzen. Pfade in der plist (uv unter `~/.local/bin/uv`,
-> Projekt `~/dev/voxprompt`) ggf. anpassen, falls du das Projekt verschiebst.
+> KeepAlive=true means: "Quit" in the menu immediately restarts the service. To really exit,
+> use `launchctl unload`. Adjust the paths in the plist (uv at `~/.local/bin/uv`,
+> project `~/dev/voxprompt`) if you move the project.
 
 ## Status
 
-Strikt schrittweise gebaut, **alle 8 Schritte fertig** (Gerüst → Audio/Hotkey →
-STT+Clipboard → LLM-Client → Modus 2 → Modus 3+Umschaltung → Hardening → LaunchAgent).
-Aufnahme → Transkription (mlx-whisper, Deutsch) → Modus-Nachbearbeitung übers lokale LLM →
-Zwischenablage/Auto-Paste, mit VAD, Halluzinations-Guard und Fehler-Notifications. Für die
-LLM-Modi muss der Server laufen (`[llm] llm_endpoint` in [config.toml](config.toml)).
+Built strictly step by step, **all 8 steps done** (scaffold → audio/hotkey →
+STT+clipboard → LLM client → mode 2 → mode 3+switching → hardening → LaunchAgent).
+Recording → transcription (mlx-whisper, German) → mode post-processing via the local LLM →
+clipboard/auto-paste, with VAD, hallucination guard and error notifications. For the
+LLM modes the server must be running (`[llm] llm_endpoint` in [config.toml](config.toml)).
 
-### Auto-Paste (optional)
+### Auto-paste (optional)
 
-`[output] auto_paste = true` in [config.toml](config.toml) fügt das Ergebnis nach dem
-Kopieren direkt per ⌘V ins fokussierte Feld ein. Braucht zusätzlich die macOS-Freigabe
-**Bedienungshilfen (Accessibility)** für den startenden Prozess.
+`[output] auto_paste = true` in [config.toml](config.toml) pastes the result right after
+copying via ⌘V into the focused field. Additionally needs the macOS permission
+**Accessibility** for the starting process.
 
-## Modi
+## Modes
 
-Über das Menüleisten-Menü (aktueller Modus mit Häkchen) oder per Hotkey:
+Via the menu bar menu (current mode checked) or by hotkey:
 
-| Modus | Hotkey | was es macht |
+| Mode | Hotkey | what it does |
 |------|--------|--------------|
-| **Roh** | ⌘⇧1 | Rohtranskript, kein LLM |
-| **Bereinigt** | ⌘⇧2 | Transkript säubern (Interpunktion, Füllwörter, korrekte engl. Schreibweise); Default |
-| **Prompt** | ⌘⇧3 | aus gesprochenem Gedanken-Dump einen einsatzbereiten Prompt bauen (beantwortet ihn NICHT) |
+| **Raw** | ⌘⇧1 | raw transcript, no LLM |
+| **Cleaned** | ⌘⇧2 | clean up the transcript (punctuation, filler words, correct English spelling); default |
+| **Prompt** | ⌘⇧3 | turn a spoken thought-dump into a ready-to-use prompt (does NOT answer it) |
 
-Der gewählte Modus gilt für die nächste Aufnahme. Hotkeys sind in
-[config.toml](config.toml) unter `[hotkeys]` einstellbar.
+The selected mode applies to the next recording. Hotkeys are configurable in
+[config.toml](config.toml) under `[hotkeys]`.
 
-## Voraussetzungen (für spätere Schritte)
+## Requirements (for later steps)
 
 - Python 3.12, [uv](https://docs.astral.sh/uv/)
-- Lokaler OpenAI-kompatibler LLM-Endpoint, z. B.:
+- Local OpenAI-compatible LLM endpoint, e.g.:
   `uv run mlx_lm.server --model mlx-community/Qwen3-4B-Instruct-4bit --port 8080`
 
-## Lizenz
+## License
 
 © 2026 Erik ([github.com/MainzelMennchen](https://github.com/MainzelMennchen)).
 
 **CC BY-NC-ND 4.0** ([Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
-International](https://creativecommons.org/licenses/by-nc-nd/4.0/)). Siehe
+International](https://creativecommons.org/licenses/by-nc-nd/4.0/)). See
 [LICENSE](LICENSE).
 
-Kurz gesagt: Du darfst voxprompt **nutzen und unverändert weitergeben**, mit
-Namensnennung. **Nicht erlaubt** sind kommerzielle Nutzung/Profit sowie das
-Weiterverbreiten von **veränderten Versionen oder abgeleiteten Werken** (auch
-geänderten Forks). Für alles darüber hinaus bitte anfragen.
+In short: you may **use and redistribute voxprompt unchanged**, with
+attribution. **Not permitted** are commercial use/profit and the
+redistribution of **modified versions or derivative works** (including
+modified forks). For anything beyond that, please ask.
