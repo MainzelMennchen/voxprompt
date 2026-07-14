@@ -1,10 +1,14 @@
 # voxprompt
 
+**Deutsch** · [English](README.en.md)
+
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black.svg)](https://www.apple.com/macos/)
 
 Lokales Push-to-Talk-Diktiertool für macOS. Deutsch-primär mit englischem
 Code-Switching: lokale Spracherkennung (mlx-whisper) und lokale LLM-Nachbearbeitung
-in drei Modi — Roh / Bereinigt / Prompt-optimiert.
+in drei Modi: Roh, Bereinigt, Prompt-optimiert.
 
 ## Start
 
@@ -16,23 +20,23 @@ Es erscheint ein 🎙-Icon in der Menüleiste; über **Quit** lässt es sich bee
 
 ## Push-to-Talk
 
-Standard-Taste: **rechte Wahltaste (right ⌥ / `<alt_r>`)** — halten zum Aufnehmen,
+Standard-Taste: **rechte Wahltaste (right ⌥ / `<alt_r>`)**. Halten zum Aufnehmen,
 loslassen zum Stoppen. Das Icon zeigt den Status: 🎙 bereit · 🔴 Aufnahme · 💭 transkribiert.
 Taste und Verhalten (`hold`/`toggle`) sind in [config.toml](config.toml) unter `[hotkeys]`
 einstellbar.
 
 Nach dem Loslassen wird die Aufnahme transkribiert (mlx-whisper, Deutsch erzwungen), je nach
-Modus nachbearbeitet und das Ergebnis **in die Zwischenablage** gelegt — eine Notification
+Modus nachbearbeitet und das Ergebnis **in die Zwischenablage** gelegt; eine Notification
 meldet „Text bereit". Danach mit ⌘V einfügen (oder per Auto-Paste, s. u.).
 
 > Beim **ersten** Lauf lädt mlx-whisper das Modell `whisper-large-v3-mlx` (~3 GB) von
-> Hugging Face — das dauert einmalig ein paar Minuten, danach ist es gecacht. Ein
+> Hugging Face. Das dauert einmalig ein paar Minuten, danach ist es gecacht. Ein
 > kleineres/schnelleres Modell lässt sich in [config.toml](config.toml) (`whisper_model`)
 > setzen, z. B. `mlx-community/whisper-tiny-mlx` zum schnellen Ausprobieren.
 
 ### macOS-Berechtigungen (nötig, sonst tut sich nichts)
 
-Beim ersten Lauf fragt macOS nicht immer von selbst — erteile manuell unter
+Beim ersten Lauf fragt macOS nicht immer von selbst. Erteile die Rechte manuell unter
 *Systemeinstellungen → Datenschutz & Sicherheit*:
 
 - **Eingabeüberwachung (Input Monitoring):** für die globale Push-to-Talk-Taste (pynput).
@@ -51,7 +55,7 @@ als Dienst: siehe Hinweis unter „Als Dienst starten"). Nach dem Erteilen die A
 ```
 
 Die `.app` ist eigenständig (eigenes Python + alle nativen MLX-Libs) und braucht weder ein
-uv-Environment noch einen laufenden Server — sie nutzt das `inprocess`-Backend. Modelle lädt
+uv-Environment noch einen laufenden Server; sie nutzt das `inprocess`-Backend. Modelle lädt
 sie beim ersten Start. Doppelklick startet die Menüleisten-App; das Signieren für die
 Weitergabe an andere Macs kommt zum Schluss (siehe Phase-2-Plan, Schritt 7/8).
 
@@ -81,9 +85,9 @@ an); das App-Icon (`.icns`) landet später im `.app`-Bundle.
 ## Erster Start: Modelle laden
 
 Beim allerersten Start lädt voxprompt die benötigten Modelle (Spracherkennung, bei
-`inprocess` zusätzlich das Sprachmodell — mehrere GB) von Hugging Face. Ein Hinweisfenster
+`inprocess` zusätzlich das Sprachmodell; mehrere GB) von Hugging Face. Ein Hinweisfenster
 erklärt das, der Fortschritt erscheint als `⬇ %` im Menüleisten-Icon, danach meldet eine
-Notification „Modelle bereit". Der App-Start selbst bleibt schnell — die Modelle werden
+Notification „Modelle bereit". Der App-Start selbst bleibt schnell: die Modelle werden
 **lazy** beim ersten Diktat in den Speicher geladen und dort gehalten. Sind die Modelle
 schon im HF-Cache, entfällt der Download.
 
@@ -93,7 +97,7 @@ schon im HF-Cache, entfällt der Download.
 - **`endpoint`** (Default, Entwicklung): HTTP gegen einen lokalen MLX-Server
   (`llm_endpoint`). Kann den Server automatisch mitstarten (s. u.).
 - **`inprocess`** (für die verteilbare App): lädt das Modell über `mlx_lm` direkt in den
-  Prozess — **kein Server, kein Port** nötig. Das Modell wird beim ersten Gebrauch geladen
+  Prozess. **Kein Server, kein Port** nötig. Das Modell wird beim ersten Gebrauch geladen
   und für die Sitzung gehalten.
 
 Beide liefern identische Ergebnisse; der Rest der App merkt nichts vom Backend.
@@ -123,7 +127,7 @@ Server-Log: `/tmp/voxprompt-mlx.log`.
 
 ## Als Dienst starten (LaunchAgent, Autostart beim Login)
 
-voxprompt läuft als **LaunchAgent** (nicht als system LaunchDaemon — eine Menüleisten-App
+voxprompt läuft als **LaunchAgent** (nicht als system LaunchDaemon; eine Menüleisten-App
 mit globalen Hotkeys braucht die eingeloggte GUI-Session). Damit startet es automatisch beim
 Login, wird nach Absturz/Beenden neu gestartet und übersteht Ab-/Anmelden und Reboot.
 
@@ -144,8 +148,8 @@ launchctl unload ~/Library/LaunchAgents/com.erik.voxprompt.plist
 # Nach einer plist-Änderung: erst unload, dann load
 ```
 
-**Wichtig — Berechtigungen für den Dienst:** Mikrofon, Eingabeüberwachung und (für
-Auto-Paste) Bedienungshilfen müssen dem Prozess erteilt werden, der jetzt startet — das ist
+**Wichtig, Berechtigungen für den Dienst:** Mikrofon, Eingabeüberwachung und (für
+Auto-Paste) Bedienungshilfen müssen dem Prozess erteilt werden, der jetzt startet; das ist
 nicht mehr dein Terminal, sondern der über launchd gestartete Python-Prozess
 (`…/voxprompt/.venv/bin/python3`). macOS fragt beim ersten Tastendruck/ersten Mikrofonzugriff;
 falls nicht, die Einträge unter *Systemeinstellungen → Datenschutz & Sicherheit* manuell
@@ -158,12 +162,11 @@ hinzufügen (Liste über „+" und den Python-Pfad). Nach dem Erteilen einmal
 
 ## Status
 
-Strikt schrittweise gebaut — **alle 8 Schritte fertig** (Gerüst → Audio/Hotkey →
+Strikt schrittweise gebaut, **alle 8 Schritte fertig** (Gerüst → Audio/Hotkey →
 STT+Clipboard → LLM-Client → Modus 2 → Modus 3+Umschaltung → Hardening → LaunchAgent).
 Aufnahme → Transkription (mlx-whisper, Deutsch) → Modus-Nachbearbeitung übers lokale LLM →
 Zwischenablage/Auto-Paste, mit VAD, Halluzinations-Guard und Fehler-Notifications. Für die
 LLM-Modi muss der Server laufen (`[llm] llm_endpoint` in [config.toml](config.toml)).
-Details siehe [CLAUDE.md](CLAUDE.md).
 
 ### Auto-Paste (optional)
 
@@ -178,7 +181,7 @@ Kopieren direkt per ⌘V ins fokussierte Feld ein. Braucht zusätzlich die macOS
 | Modus | Hotkey | was es macht |
 |------|--------|--------------|
 | **Roh** | ⌘⇧1 | Rohtranskript, kein LLM |
-| **Bereinigt** | ⌘⇧2 | Transkript säubern (Interpunktion, Füllwörter, korrekte engl. Schreibweise) — Default |
+| **Bereinigt** | ⌘⇧2 | Transkript säubern (Interpunktion, Füllwörter, korrekte engl. Schreibweise); Default |
 | **Prompt** | ⌘⇧3 | aus gesprochenem Gedanken-Dump einen einsatzbereiten Prompt bauen (beantwortet ihn NICHT) |
 
 Der gewählte Modus gilt für die nächste Aufnahme. Hotkeys sind in
@@ -195,7 +198,7 @@ Der gewählte Modus gilt für die nächste Aufnahme. Hotkeys sind in
 © 2026 Erik ([github.com/MainzelMennchen](https://github.com/MainzelMennchen)).
 
 **CC BY-NC-ND 4.0** ([Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
-International](https://creativecommons.org/licenses/by-nc-nd/4.0/)) — siehe
+International](https://creativecommons.org/licenses/by-nc-nd/4.0/)). Siehe
 [LICENSE](LICENSE).
 
 Kurz gesagt: Du darfst voxprompt **nutzen und unverändert weitergeben**, mit
