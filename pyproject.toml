@@ -3,6 +3,8 @@ name = "voxprompt"
 version = "0.1.0"
 description = "Lokales Push-to-Talk-Diktiertool für macOS: mlx-whisper STT + lokale LLM-Nachbearbeitung in drei Modi."
 readme = "README.md"
+license = "CC-BY-NC-ND-4.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 
 # Schrittweiser Aufbau: vorerst nur das, was zum Starten der Menüleisten-App nötig ist.

@@ -187,3 +187,14 @@ Der gewählte Modus gilt für die nächste Aufnahme. Hotkeys sind in
 - Python 3.12, [uv](https://docs.astral.sh/uv/)
 - Lokaler OpenAI-kompatibler LLM-Endpoint, z. B.:
   `uv run mlx_lm.server --model mlx-community/Qwen3-4B-Instruct-4bit --port 8080`
+
+## Lizenz
+
+**CC BY-NC-ND 4.0** ([Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
+International](https://creativecommons.org/licenses/by-nc-nd/4.0/)) — siehe
+[LICENSE](LICENSE).
+
+Kurz gesagt: Du darfst voxprompt **nutzen und unverändert weitergeben**, mit
+Namensnennung. **Nicht erlaubt** sind kommerzielle Nutzung/Profit sowie das
+Weiterverbreiten von **veränderten Versionen oder abgeleiteten Werken** (auch
+geänderten Forks). Für alles darüber hinaus bitte anfragen.
