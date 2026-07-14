@@ -16,10 +16,11 @@ import soundfile as sf
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-mlx"
 SAMPLE_RATE = 16_000
 
-# Bekannte deutsche Whisper-Halluzinationen (Untertitel-/Outro-Floskeln), die bei
+# Bekannte Whisper-Halluzinationen (Untertitel-/Outro-Floskeln), die bei
 # Stille auftauchen. Vergleich case-insensitiv; greift nur, wenn sie praktisch die
 # GANZE Ausgabe sind (sonst könnte echter Text fälschlich verworfen werden).
 _HALLUCINATION_PHRASES = (
+    # German
     "vielen dank",
     "vielen dank.",
     "tschüss",
@@ -30,6 +31,11 @@ _HALLUCINATION_PHRASES = (
     "untertitel der amara.org-community",
     "das war's",
     "bis zum nächsten mal",
+    # English
+    "thank you",
+    "subtitles",
+    "this is all",
+    "that's it",
 )
 
 

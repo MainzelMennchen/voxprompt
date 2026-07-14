@@ -19,6 +19,12 @@ from voxprompt.transcribe import looks_like_hallucination
         "Tschüss!",
         "danke danke danke danke",
         "ja ja ja ja ja ja ja ja",
+        # English Hallucinations (kurze Varianten)
+        "Thank you.",
+        "thank you",
+        "subtitles",
+        "this is all",
+        "that's it",
     ],
 )
 def test_geistertext_wird_erkannt(text: str) -> None:

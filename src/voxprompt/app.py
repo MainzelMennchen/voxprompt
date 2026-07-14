@@ -39,6 +39,11 @@ DL_TITLE = "⬇"  # mit Prozent während des Modell-Downloads
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-large-v3-mlx"
 DEFAULT_LANGUAGE = "de"
 
+# Menü-Beschriftung + Reihenfolge der Sprachen.
+LANGUAGE_LABELS: dict[str, str] = {"de": "DE", "en": "EN"}
+# Config-Schlüssel für die Direkt-Hotkeys je Sprache.
+LANGUAGE_HOTKEY_KEYS = ("lang_de", "lang_en")
+
 # Menü-Beschriftung + Reihenfolge der Modi.
 MODE_LABELS: dict[Mode, str] = {
     Mode.RAW: "Roh",
@@ -167,8 +172,6 @@ class VoxPromptApp(rumps.App):
         self._last_update_check = time.monotonic()
 
         self._mode = self._parse_mode(config.get("modes", {}).get("default_mode", "cleanup"))
-
-        # Modell-Verwaltung: schnell lokal prüfen, welche Modelle fehlen (kein Netz).
         # Whisper-Loader cachen, damit das Modell über Aufrufe im Speicher bleibt.
         models.install_session_caches()
         self._missing_models = models.missing_models(config)
@@ -190,7 +193,11 @@ class VoxPromptApp(rumps.App):
                 )
         self._shut_down = False
 
-        # Menü: drei Modi (aktueller mit Häkchen), Login-Item-Schalter, Quit.
+        # Menü: Sprache-Item (DE/EN), drei Modi (aktueller mit Häkchen), Login-Item-Schalter, Quit.
+        self._language_items: dict[str, rumps.MenuItem] = {
+            lang: rumps.MenuItem(LANGUAGE_LABELS[lang], callback=self._make_language_callback(lang))
+            for lang in LANGUAGE_LABELS
+        }
         self._mode_items: dict[Mode, rumps.MenuItem] = {
             mode: rumps.MenuItem(MODE_LABELS[mode], callback=self._make_mode_callback(mode))
             for mode in MODE_LABELS
@@ -205,7 +212,8 @@ class VoxPromptApp(rumps.App):
             if self._update_repo
             else None
         )
-        menu = [self._mode_items[m] for m in MODE_LABELS] + [None]
+        menu = [self._language_items[l] for l in LANGUAGE_LABELS] + [None]
+        menu += [self._mode_items[m] for m in MODE_LABELS] + [None]
         if self._update_item is not None:
             menu.append(self._update_item)
         menu += [self._login_item, None, rumps.MenuItem("Quit", callback=self._on_quit)]
@@ -213,13 +221,19 @@ class VoxPromptApp(rumps.App):
         self._sync_mode_menu()
         self._sync_login_item()
 
-        # Direkt-Hotkeys je Modus (z. B. ⌘⇧1/2/3) -> Moduswechsel. Laufen im
-        # SELBEN Listener wie Push-to-Talk (zwei pynput-Listener crashen auf macOS).
+        # Direkt-Hotkeys je Sprache und Modus (z. B. ⌘⌥D/E + ⌘⇧1/2/3) -> Umschaltung.
+        # Laufen im SELBEN Listener wie Push-to-Talk (zwei pynput-Listener crashen auf macOS).
         combos = {
             spec: self._make_mode_callback(mode, sender=False)
             for mode in MODE_HOTKEY_KEYS
             if (spec := hotkeys.get(MODE_HOTKEY_KEYS[mode]))
         }
+        # Sprach-Hotkeys nicht als Combos (kein Moduswechsel), sondern direkt.
+        combos.update({
+            spec: self._make_language_callback(lang, sender=False)
+            for lang in LANGUAGE_HOTKEY_KEYS
+            if (spec := hotkeys.get(lang))
+        })
 
         self._recorder = Recorder()
         self._processing = False
@@ -365,6 +379,26 @@ class VoxPromptApp(rumps.App):
         for mode, item in self._mode_items.items():
             item.state = 1 if mode == self._mode else 0
 
+    # --- Sprach-Umschaltung ---
+
+    def _make_language_callback(self, lang: str, sender: bool = True):
+        """Callback-Fabrik für Sprache-Wechsel."""
+        if sender:
+            return lambda _sender: self._set_language(lang)
+        return lambda: self._set_language(lang)
+
+    def _set_language(self, lang: str) -> None:
+        if lang == self._language:
+            return
+        self._language = lang
+        print(f"[voxprompt] Sprache: {lang}", flush=True)
+        self._notify("Sprache", LANGUAGE_LABELS[lang])
+        # Häkchen wird vom Timer (Main-Thread) synchronisiert.
+
+    def _sync_language_menu(self) -> None:
+        for lang, item in self._language_items.items():
+            item.state = 1 if lang == self._language else 0
+
     # --- Login-Item (Start beim Anmelden) ---
 
     def _sync_login_item(self) -> None:
@@ -480,6 +514,7 @@ class VoxPromptApp(rumps.App):
                     self._mode,
                     raw,
                     self._llm,
+                    language=self._language,
                     model_override=model_for_mode,
                     request_overrides=self._mode_request_overrides.get(self._mode),
                 )
@@ -618,6 +653,7 @@ class VoxPromptApp(rumps.App):
             self.title = desired
 
         self._sync_mode_menu()
+        self._sync_language_menu()
         self._sync_update_item()
         # Login-Item-Status seltener prüfen (SMAppService-Aufruf), ~alle 2.4 s.
         self._tick = getattr(self, "_tick", 0) + 1

@@ -66,6 +66,9 @@ push_to_talk_mode = "hold"
 mode_raw = "<cmd>+<shift>+1"
 mode_cleanup = "<cmd>+<shift>+2"
 mode_prompt = "<cmd>+<shift>+3"
+# Direkt-in-Sprache-aufnehmen Hotkeys (neu: Schritt X).
+lang_de = "<ctrl>+<alt>+d"
+lang_en = "<ctrl>+<alt>+e"
 
 [audio]
 # Sprachaktivitätserkennung (VAD) vor der Transkription, gegen Geistertext bei Stille.

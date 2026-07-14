@@ -42,6 +42,12 @@ _PROMPT_FILE = {
     Mode.PROMPT: "prompt_builder",
 }
 
+# Sprachvarianten für cleanup (default="de", alternative="en")
+_CLEANUP_LANGUAGE_VARIANTS = {
+    "de": "cleanup",
+    "en": "cleanup_en",
+}
+
 
 @lru_cache(maxsize=None)
 def load_prompt(name: str) -> str:
@@ -55,6 +61,7 @@ def process(
     transcript: str,
     llm: "LLMBackend",
     *,
+    language: str = "de",
     model_override: str | None = None,
     request_overrides: dict | None = None,
 ) -> str:
@@ -65,6 +72,7 @@ def process(
     llm.complete(). Ein LLMError wird durchgereicht — der Aufrufer (app.py) zeigt
     daraus eine Menüleisten-Notification.
 
+    language: Sprache für den Cleanup-Modus ("de" oder "en") → wählt cleanup.md vs cleanup_en.md.
     model_override: optionaler Modellname für diesen Request (nur endpoint-Backend).
     Wenn None, nutzt das Backend sein Default-Modell.
     request_overrides: optionale per-Modus-Parameter für llm.complete()
@@ -72,7 +80,11 @@ def process(
     """
     if mode == Mode.RAW:
         return transcript
-    system_prompt = load_prompt(_PROMPT_FILE[mode])
+    if mode == Mode.CLEANUP:
+        prompt_name = _CLEANUP_LANGUAGE_VARIANTS.get(language, "cleanup")
+    else:
+        prompt_name = _PROMPT_FILE[mode]
+    system_prompt = load_prompt(prompt_name)
     return llm.complete(
         system_prompt, transcript, model=model_override, **(request_overrides or {})
     )

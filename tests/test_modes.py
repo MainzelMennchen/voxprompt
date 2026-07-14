@@ -99,3 +99,35 @@ def test_request_overrides_none_ist_leer() -> None:
     llm = FakeLLM("x")
     process(Mode.CLEANUP, "hallo", llm)
     assert llm.kwargs[0] == {}
+
+
+# --- Sprachvarianten für cleanup ---
+
+def test_load_prompt_cleanup_en_lädt_englischen_prompt() -> None:
+    prompt = load_prompt("cleanup_en")
+    assert "transcript corrector" in prompt.lower()
+    # Englisches Füllwort im Prompt enthalten?
+    assert any(word in prompt.lower() for word in ("um", "uh", "like", "you know"))
+
+
+def test_cleanup_wählt_prompt_nach_sprache() -> None:
+    """Cleanup wählt cleanup.md vs cleanup_en.md abhängig von language."""
+    llm = FakeLLM("bereinigt")
+    process(Mode.CLEANUP, "hallo welt", llm, language="de")
+    system_de, _, _ = llm.calls[0]
+
+    llm2 = FakeLLM("cleaned")
+    process(Mode.CLEANUP, "hello world", llm2, language="en")
+    system_en, _, _ = llm2.calls[0]
+
+    assert system_de != system_en  # unterschiedliche Prompts
+    assert "Transkript-Korrektor" in system_de
+    # cleanup_en.md muss englischen Inhalt haben
+
+
+def test_raw_ignoriert_language_parameter() -> None:
+    """Raw-Modus ruft LLM nicht auf — language ist irrelevant."""
+    llm = FakeLLM("sollte nicht kommen")
+    result = process(Mode.RAW, "rohtext", llm, language="en")
+    assert result == "rohtext"
+    assert llm.calls == []
