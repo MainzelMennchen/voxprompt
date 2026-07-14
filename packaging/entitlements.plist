@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Entitlements für die Notarisierung (Hardened Runtime).
+    Nötig, weil das Bundle ein eigenes Python + fremd-signierte native Libs
+    (mlx, libsndfile/libportaudio, viele .so/.dylib) lädt. Diese Rechte werden
+    NUR auf die Haupt-Binary des App-Bundles angewandt (siehe sign_app.sh),
+    nicht auf jede einzelne dylib.
+
+    Kein App Sandbox: voxprompt braucht globale Hotkeys (Eingabeüberwachung)
+    und simuliertes ⌘V (Bedienungshilfen) — das ginge unter Sandbox nicht.
+    Mikrofonzugriff läuft über TCC + NSMicrophoneUsageDescription (Info.plist),
+    nicht über ein Sandbox-Entitlement.
+  -->
+
+  <!-- Python/MLX nutzen JIT- bzw. ausführbaren Speicher zur Laufzeit. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- Erlaubt das Laden von Libs, die NICHT von deiner Team-ID signiert sind
+       (mlx.metallib-Dylibs, libsndfile, libportaudio …). Ohne das startet die
+       notarisierte App nicht. Der wichtigste Eintrag für dieses Bundle. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!-- py2app/das Bundle setzen DYLD_*/PYTHONHOME beim Start. -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+</dict>
+</plist>
