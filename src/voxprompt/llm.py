@@ -12,6 +12,7 @@ das gemeinsame `LLMBackend`-Protokoll und merkt nichts vom konkreten Backend.
 
 from __future__ import annotations
 
+import gc
 import re
 from typing import Protocol, runtime_checkable
 
@@ -29,7 +30,16 @@ class LLMError(Exception):
 class LLMBackend(Protocol):
     """Gemeinsame Schnittstelle beider Backends (was modes.py braucht)."""
 
-    def complete(self, system_prompt: str, user_text: str) -> str: ...
+    def complete(
+        self,
+        system_prompt: str,
+        user_text: str,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: float | None = None,
+    ) -> str: ...
 
     def close(self) -> None: ...
 
@@ -83,28 +93,47 @@ class LLMClient:
             disable_thinking=llm.get("disable_thinking", True),
         )
 
-    def complete(self, system_prompt: str, user_text: str) -> str:
+    def complete(
+        self,
+        system_prompt: str,
+        user_text: str,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: float | None = None,
+    ) -> str:
         """Schickt System- + User-Message und gibt den Antworttext zurück.
+
+        Die optionalen Parameter überschreiben die Konstruktor-Defaults für diesen
+        einen Request (per-Modus Overrides): `model` das Modell, `temperature` die
+        Sampling-Temperatur (ohne Angabe entscheidet der Server), `max_tokens` das
+        Antwort-Budget, `timeout` die Wartezeit in Sekunden.
 
         Wirft bei jedem Problem (Endpoint nicht erreichbar, Timeout, HTTP-Fehler,
         unerwartete Antwort) ein LLMError mit klarer Meldung — kein stiller Absturz.
         """
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_text},
             ],
             "stream": False,
-            "max_tokens": self.max_tokens,
+            "max_tokens": max_tokens or self.max_tokens,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
         if self.disable_thinking:
             # Reasoning-/Thinking-Modelle (z. B. Qwen3.x) verbrauchen sonst das ganze
             # Token-Budget fürs Denken und liefern leeren content. Schaltet das Denken
             # ab (von mlx_lm / Qwen unterstützt; andere Server ignorieren das Feld).
             payload["chat_template_kwargs"] = {"enable_thinking": False}
+        effective_timeout = timeout if timeout is not None else self.timeout_seconds
         try:
-            response = self._client.post(self._endpoint, json=payload)
+            response = self._client.post(
+                self._endpoint, json=payload, timeout=effective_timeout
+            )
             response.raise_for_status()
         except httpx.ConnectError as exc:
             raise LLMError(
@@ -112,7 +141,7 @@ class LLMClient:
             ) from exc
         except httpx.TimeoutException as exc:
             raise LLMError(
-                f"LLM-Zeitüberschreitung nach {self.timeout_seconds}s ({self.base_url})."
+                f"LLM-Zeitüberschreitung nach {effective_timeout}s ({self.base_url})."
             ) from exc
         except httpx.HTTPStatusError as exc:
             detail = exc.response.text.strip()[:200]
@@ -155,10 +184,13 @@ class LLMClient:
 
 
 class InProcessLLM:
-    """LLM-Backend ohne Server: lädt das Modell über mlx_lm direkt in den Prozess.
+    """LLM-Backend ohne Server: lädt Modelle über mlx_lm direkt in den Prozess.
 
-    Das Modell wird lazy beim ersten `complete()` geladen (App-Start bleibt schnell)
-    und danach für die Session im Speicher gehalten.
+    Es ist immer genau EIN Modell im Speicher (lazy beim ersten `complete()`
+    geladen, App-Start bleibt schnell). Fordert ein Aufruf per `model`-Override
+    ein anderes Modell an (per-Modus-Modelle), wird das aktuelle entladen und
+    das angeforderte geladen — ein Moduswechsel kostet damit einmalig die
+    Ladezeit (~10 s bei 9B-4bit), hält den RAM-Bedarf aber bei einem Modell.
     """
 
     def __init__(
@@ -172,6 +204,7 @@ class InProcessLLM:
         self.disable_thinking = disable_thinking
         self._model = None
         self._tokenizer = None
+        self._loaded_id: str | None = None
 
     @classmethod
     def from_config(cls, config: dict) -> "InProcessLLM":
@@ -183,18 +216,56 @@ class InProcessLLM:
             disable_thinking=llm.get("disable_thinking", True),
         )
 
-    def _ensure_loaded(self) -> None:
-        if self._model is None:
-            from mlx_lm import load  # Import hier, damit der App-Start nicht wartet
+    def _ensure_loaded(self, model_id: str) -> None:
+        """Stellt sicher, dass genau `model_id` geladen ist (entlädt ggf. das alte)."""
+        if self._model is not None and self._loaded_id == model_id:
+            return
+        if self._model is not None:
+            print(
+                f"[voxprompt] Modellwechsel: entlade {self._loaded_id}, lade {model_id} …",
+                flush=True,
+            )
+            self._unload()
+        from mlx_lm import load  # Import hier, damit der App-Start nicht wartet
 
-            self._model, self._tokenizer = load(self.model_id)
+        self._model, self._tokenizer = load(model_id)
+        self._loaded_id = model_id
 
-    def complete(self, system_prompt: str, user_text: str) -> str:
-        """Erzeugt die Antwort lokal über mlx_lm — identische Semantik wie LLMClient."""
+    def _unload(self) -> None:
+        """Gibt das aktuell geladene Modell frei (inkl. Metal-Buffer)."""
+        self._model = None
+        self._tokenizer = None
+        self._loaded_id = None
+        gc.collect()
+        try:
+            import mlx.core as mx
+
+            mx.clear_cache()  # gibt die Metal-Buffer wirklich ans System zurück
+        except Exception:
+            pass
+
+    def complete(
+        self,
+        system_prompt: str,
+        user_text: str,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        """Erzeugt die Antwort lokal über mlx_lm — identische Semantik wie LLMClient.
+
+        `model` wählt das Modell für diesen Aufruf (per-Modus-Modelle): weicht es
+        vom aktuell geladenen ab, wird gewechselt (entladen + laden, ~10 s).
+        Ohne Angabe läuft self.model_id. `max_tokens` überschreibt das Budget;
+        `temperature` und `timeout` werden ignoriert (mlx_lm-Default-Sampler,
+        synchrone Generierung).
+        """
         from mlx_lm import generate
 
         try:
-            self._ensure_loaded()
+            self._ensure_loaded(model or self.model_id)
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_text},
@@ -213,7 +284,7 @@ class InProcessLLM:
                 self._model,
                 self._tokenizer,
                 prompt=prompt,
-                max_tokens=self.max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 verbose=False,
             )
         except Exception as exc:
@@ -225,9 +296,8 @@ class InProcessLLM:
         return content
 
     def close(self) -> None:
-        """Gibt das Modell frei (für die nächste Session neu laden)."""
-        self._model = None
-        self._tokenizer = None
+        """Gibt das geladene Modell frei (für die nächste Session neu laden)."""
+        self._unload()
 
 
 def create_llm(config: dict) -> LLMBackend:

@@ -7,9 +7,19 @@ whisper_model = "mlx-community/whisper-large-v3-mlx"
 primary_language = "de"
 
 [llm]
-# Bundle: Modell direkt im Prozess laden, ohne Server.
+# Bundle: Modelle direkt im Prozess laden, ohne Server.
 llm_backend = "inprocess"
 llm_model = "mlx-community/Qwen3.5-9B-MLX-4bit"
+# Per-Modus-Modelle: InProcessLLM hält immer nur EIN Modell im Speicher und
+# wechselt beim Moduswechsel (entladen + laden, ~10 s einmalig pro Wechsel).
+# Bereinigen: Stock-9B; Prompt: das eigene prompt-tuner-Finetune (HF-Backup).
+cleanup_model = "mlx-community/Qwen3.5-9B-MLX-4bit"
+prompt_model = "MainzelMennchen/prompt-tuner-8b"
+# Request-Parameter für den Prompt-Modus (Werte aus dem Finetune-Training;
+# temperature/timeout ignoriert das inprocess-Backend, max_tokens greift).
+prompt_temperature = 0.2
+prompt_max_tokens = 800
+prompt_timeout_seconds = 30
 api_key = ""
 timeout_seconds = 120
 max_tokens = 2000
@@ -33,3 +43,19 @@ min_speech_ms = 200
 
 [output]
 auto_paste = false
+
+[updates]
+# Update-Hinweis (Option 1): neuestes GitHub-Release gegen die laufende Version
+# prüfen und im Menü melden. Kein Self-Update — der Nutzer lädt das DMG selbst.
+# "owner/name" des echten GitHub-Repos; leer = Feature aus.
+repo = "MainzelMennchen/voxprompt"
+check_on_start = true
+check_interval_hours = 24
+
+[logging]
+# Trainingspaare werden NUR geloggt, wenn der Prompt-Modus mit exakt
+# training_source_model gelaufen ist (das schon trainierte Finetune) —
+# Outputs anderer Modelle verunreinigen die Trainingsdaten und bleiben draußen.
+training_log = "~/voxprompt_data/log.jsonl"
+training_log_model = "prompt-tuner-8b-v2"
+training_source_model = "MainzelMennchen/prompt-tuner-8b"

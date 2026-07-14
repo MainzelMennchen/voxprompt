@@ -19,7 +19,20 @@ llm_backend = "endpoint"
 # Aktuell: LM Studio.
 llm_endpoint = "http://127.0.0.1:1234/v1"
 # Muss dem im Server geladenen Modellnamen entsprechen (siehe GET /v1/models).
-llm_model = "qwen3.6-35b-a3b-mtp"
+llm_model = "prompt-tuner-8b"
+# Per-Modus Modell-Override (nur für endpoint-Backend). Wenn leer, wird das
+# globale llm_model genutzt. Modellname muss dem im LM Studio geladenen Modell
+# entsprechen (GET /v1/models).
+cleanup_model = "qwen3.5-9b-mtp"
+# Prompt-Modus = Prompt-Optimierer (eigenes QLoRA-Finetune). Achtung: LM Studio
+# fällt bei unbekanntem Namen stillschweigend auf das geladene Modell zurück —
+# die ID muss exakt der aus GET /v1/models entsprechen ("prompt-tuner-8b",
+# NICHT "erik/prompt-tuner-8b").
+prompt_model = "prompt-tuner-8b"
+# Request-Parameter für den Prompt-Modus — Werte aus dem Finetune-Training.
+prompt_temperature = 0.2
+prompt_max_tokens = 800
+prompt_timeout_seconds = 30
 # Optionaler API-Key (für lokale Server meist leer). Leerstring = kein Key.
 api_key = ""
 # Timeout für LLM-Anfragen in Sekunden.
@@ -65,3 +78,26 @@ min_speech_ms = 200
 # Wenn true: Ergebnis zusätzlich per simuliertem Cmd+V einfügen (Schritt 7).
 # Braucht die macOS-Berechtigung "Bedienungshilfen".
 auto_paste = false
+
+[updates]
+# Update-Hinweis (Option 1): prüft das neueste GitHub-Release gegen die laufende
+# Version und meldet es im Menü ("⬆︎ Update auf vX laden" öffnet die Release-Seite).
+# Kein Self-Update — der Nutzer lädt das DMG selbst. Muss dem echten GitHub-Repo
+# entsprechen ("owner/name"); leer = Feature aus (kein Menüpunkt). Ein nicht
+# existierendes Repo liefert einfach kein Update (404 -> nichts passiert).
+repo = "MainzelMennchen/voxprompt"
+# Beim Start einmal prüfen.
+check_on_start = true
+# Wiederholt alle N Stunden prüfen (die App läuft dauerhaft in der Menüleiste).
+# 0 = nur beim Start und manuell über den Menüpunkt.
+check_interval_hours = 24
+
+[logging]
+# Trainingsdaten fürs nächste Finetune: jedes ERFOLGREICHE Prompt-Modus-Paar
+# (rohes Diktat -> Optimierer-Output) wird als JSONL-Zeile angehängt — aber NUR,
+# wenn das Prompt-Modus-Modell exakt training_source_model ist (das schon
+# trainierte Finetune). Leer = Logging aus. Fallback-Fälle werden nie geloggt.
+# "final" bleibt null und ist für manuell korrigierte Endfassungen reserviert.
+training_log = "~/voxprompt_data/log.jsonl"
+training_log_model = "prompt-tuner-8b-v2"
+training_source_model = "prompt-tuner-8b"

@@ -27,13 +27,25 @@ ProgressCb = Callable[[str, int, int], None]
 
 
 def required_models(config: dict) -> dict[str, str]:
-    """Liefert {Anzeigename: HF-Repo} der für das aktuelle Setup nötigen Modelle."""
+    """Liefert {Anzeigename: HF-Repo} der für das aktuelle Setup nötigen Modelle.
+
+    Im inprocess-Backend zählen auch die per-Modus-Modelle (cleanup_model/
+    prompt_model) dazu — die App lädt sie beim Moduswechsel und braucht sie
+    daher lokal. Doppelte Repos werden nur einmal aufgeführt.
+    """
     transcription = config.get("transcription", {})
     llm = config.get("llm", {})
     models = {"Spracherkennung": transcription.get("whisper_model", DEFAULT_WHISPER)}
-    llm_model = llm.get("llm_model")
-    if llm.get("llm_backend", "endpoint") == "inprocess" and llm_model:
-        models["Sprachmodell"] = llm_model
+    if llm.get("llm_backend", "endpoint") == "inprocess":
+        seen: set[str] = set()
+        for label, repo in (
+            ("Sprachmodell", llm.get("llm_model")),
+            ("Sprachmodell (Bereinigen)", llm.get("cleanup_model")),
+            ("Sprachmodell (Prompt)", llm.get("prompt_model")),
+        ):
+            if repo and repo not in seen:
+                models[label] = repo
+                seen.add(repo)
     return models
 
 

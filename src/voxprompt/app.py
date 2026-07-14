@@ -17,12 +17,14 @@ import atexit
 import os
 import signal
 import threading
+import time
 import tomllib
+import webbrowser
 from pathlib import Path
 
 import rumps
 
-from voxprompt import audio, login_item, models, modes, output, transcribe
+from voxprompt import __version__, audio, datalog, login_item, models, modes, output, transcribe, updates
 from voxprompt.audio import Recorder
 from voxprompt.hotkeys import HotkeyListener
 from voxprompt.llm import LLMError, create_llm
@@ -114,6 +116,7 @@ class VoxPromptApp(rumps.App):
         audio_cfg = config.get("audio", {})
         output_cfg = config.get("output", {})
         llm_cfg = config.get("llm", {})
+        updates_cfg = config.get("updates", {})
 
         self._whisper_model = transcription.get("whisper_model", DEFAULT_WHISPER_MODEL)
         self._language = transcription.get("primary_language", DEFAULT_LANGUAGE)
@@ -123,6 +126,46 @@ class VoxPromptApp(rumps.App):
 
         # Nachbearbeitung: LLM-Backend (endpoint|inprocess) + aktiver Modus.
         self._llm = create_llm(config)
+
+        # Per-Modus Modell-Override aus Config (nur endpoint-Backend nutzt das).
+        _default_model = llm_cfg.get("llm_model", "")
+        self._mode_models: dict[Mode, str | None] = {
+            Mode.CLEANUP: (llm_cfg.get("cleanup_model") or _default_model) or None,
+            Mode.PROMPT: (llm_cfg.get("prompt_model") or _default_model) or None,
+            Mode.RAW: None,
+        }
+
+        # Per-Modus Request-Parameter: der Prompt-Modus (prompt-tuner-8b) läuft mit
+        # den Werten aus dem Finetune-Training (temperature 0.2, knappes Budget).
+        self._mode_request_overrides: dict[Mode, dict] = {
+            Mode.PROMPT: {
+                "temperature": llm_cfg.get("prompt_temperature", 0.2),
+                "max_tokens": llm_cfg.get("prompt_max_tokens", 800),
+                "timeout": llm_cfg.get("prompt_timeout_seconds", 30),
+            },
+        }
+
+        # Trainingsdaten-Logging: erfolgreiche Prompt-Modus-Paare für das nächste
+        # Finetune (siehe datalog.py). Geloggt wird NUR, wenn das Prompt-Modus-Modell
+        # exakt training_source_model ist (der schon trainierte prompt-tuner) —
+        # Outputs anderer Modelle würden die Trainingsdaten verunreinigen.
+        # Leeres training_source_model = Logging aus. Fallback-Fälle nie loggen.
+        log_cfg = config.get("logging", {})
+        self._training_log_path = log_cfg.get("training_log", "~/voxprompt_data/log.jsonl")
+        self._training_log_label = log_cfg.get("training_log_model", "prompt-tuner-8b-v2")
+        self._training_source_model = log_cfg.get("training_source_model", "")
+
+        # Update-Hinweis (Option 1): GitHub-Release gegen __version__ prüfen und im
+        # Menü melden — kein Self-Update, der Nutzer lädt das DMG selbst. Leeres
+        # repo = Feature aus (kein Menüpunkt). check_interval_hours=0 = nur beim
+        # Start und manuell.
+        self._update_repo = updates_cfg.get("repo", "")
+        self._check_updates_on_start = bool(updates_cfg.get("check_on_start", True))
+        self._update_interval = float(updates_cfg.get("check_interval_hours", 24)) * 3600.0
+        self._pending_update: updates.UpdateInfo | None = None
+        self._update_checking = False
+        self._last_update_check = time.monotonic()
+
         self._mode = self._parse_mode(config.get("modes", {}).get("default_mode", "cleanup"))
 
         # Modell-Verwaltung: schnell lokal prüfen, welche Modelle fehlen (kein Netz).
@@ -155,10 +198,18 @@ class VoxPromptApp(rumps.App):
         self._login_item = rumps.MenuItem(
             "Beim Anmelden starten", callback=self._toggle_login_item
         )
-        self.menu = (
-            [self._mode_items[m] for m in MODE_LABELS]
-            + [None, self._login_item, None, rumps.MenuItem("Quit", callback=self._on_quit)]
+        # Update-Menüpunkt nur, wenn ein Repo konfiguriert ist. Titel/Callback
+        # wechseln je nach Zustand (siehe _sync_update_item / _on_update_menu).
+        self._update_item = (
+            rumps.MenuItem("Auf Updates prüfen …", callback=self._on_update_menu)
+            if self._update_repo
+            else None
         )
+        menu = [self._mode_items[m] for m in MODE_LABELS] + [None]
+        if self._update_item is not None:
+            menu.append(self._update_item)
+        menu += [self._login_item, None, rumps.MenuItem("Quit", callback=self._on_quit)]
+        self.menu = menu
         self._sync_mode_menu()
         self._sync_login_item()
 
@@ -204,6 +255,9 @@ class VoxPromptApp(rumps.App):
         if self._missing_models:
             self._firstrun_timer = rumps.Timer(self._first_run_check, 0.5)
             self._firstrun_timer.start()
+        # Update-Check im Hintergrund (blockiert den Start nicht).
+        if self._update_repo and self._check_updates_on_start:
+            self._start_update_check(notify_if_current=False)
         self._register_exit_hooks()
         super().run()
 
@@ -421,8 +475,25 @@ class VoxPromptApp(rumps.App):
                 Mode.PROMPT: ProcessingPhase.PROMPTING,
             }[self._mode]
             try:
-                final = modes.process(self._mode, raw, self._llm)
+                model_for_mode = self._mode_models.get(self._mode)
+                final = modes.process(
+                    self._mode,
+                    raw,
+                    self._llm,
+                    model_override=model_for_mode,
+                    request_overrides=self._mode_request_overrides.get(self._mode),
+                )
                 title = "Text bereit – einfügen mit ⌘V"
+                if (
+                    self._mode == Mode.PROMPT
+                    and self._training_source_model
+                    and model_for_mode == self._training_source_model
+                ):
+                    # Erfolgreiches Optimierer-Paar als Trainingsdatum sichern —
+                    # nur wenn wirklich der trainierte prompt-tuner geantwortet hat.
+                    datalog.append_pair(
+                        self._training_log_path, self._training_log_label, raw, final
+                    )
             except LLMError as exc:
                 print(f"[voxprompt] LLM-Fehler, nutze Rohtext: {exc}", flush=True)
                 self._notify("LLM nicht verfügbar – Rohtext kopiert", str(exc))
@@ -452,6 +523,63 @@ class VoxPromptApp(rumps.App):
                 self._notify("Auto-Paste fehlgeschlagen", f"{exc} (Text liegt in der Zwischenablage)")
         preview = text if len(text) <= 80 else text[:77] + "…"
         self._notify(title, preview)
+
+    # --- Update-Hinweis (Option 1: melden, kein Self-Update) ---
+
+    def _start_update_check(self, notify_if_current: bool) -> None:
+        """Startet einen Update-Check im Hintergrund (mehrfach-aufruf-sicher)."""
+        if self._update_checking or not self._update_repo:
+            return
+        self._update_checking = True
+        threading.Thread(
+            target=self._check_updates, args=(notify_if_current,), daemon=True
+        ).start()
+
+    def _check_updates(self, notify_if_current: bool) -> None:
+        """Fragt GitHub ab; bei neuerer Version -> Notification + Menü-Hinweis."""
+        try:
+            info = updates.check_for_update(self._update_repo)
+            if info is not None:
+                self._pending_update = info
+                print(f"[voxprompt] Update verfügbar: {info.version} ({info.url})", flush=True)
+                self._notify(
+                    "Update verfügbar",
+                    f"voxprompt {info.version} ist verfügbar — im Menü herunterladen.",
+                )
+            elif notify_if_current:
+                self._notify("Kein Update", f"voxprompt {__version__} ist aktuell.")
+        except Exception as exc:  # updates.* wirft eigentlich nie
+            print(f"[voxprompt] Update-Check fehlgeschlagen: {exc}", flush=True)
+        finally:
+            self._update_checking = False
+
+    def _on_update_menu(self, _sender) -> None:  # noqa: ANN001
+        """Menü-Klick: bei bekanntem Update die Release-Seite öffnen, sonst prüfen."""
+        if self._pending_update is not None:
+            webbrowser.open(self._pending_update.url)
+            return
+        self._notify("Update-Prüfung", "Suche nach Updates …")
+        self._start_update_check(notify_if_current=True)
+
+    def _sync_update_item(self) -> None:
+        """Menü-Titel an den Update-Status angleichen (läuft auf dem Main-Thread)."""
+        if self._update_item is None:
+            return
+        if self._pending_update is not None:
+            want = f"⬆︎ Update auf {self._pending_update.version} laden"
+        else:
+            want = "Auf Updates prüfen …"
+        if self._update_item.title != want:
+            self._update_item.title = want
+        # Periodischer Re-Check (nur wenn Intervall gesetzt und kein Update offen).
+        if (
+            self._update_interval > 0
+            and self._pending_update is None
+            and not self._update_checking
+            and time.monotonic() - self._last_update_check >= self._update_interval
+        ):
+            self._last_update_check = time.monotonic()
+            self._start_update_check(notify_if_current=False)
 
     # --- UI ---
 
@@ -490,6 +618,7 @@ class VoxPromptApp(rumps.App):
             self.title = desired
 
         self._sync_mode_menu()
+        self._sync_update_item()
         # Login-Item-Status seltener prüfen (SMAppService-Aufruf), ~alle 2.4 s.
         self._tick = getattr(self, "_tick", 0) + 1
         if self._tick % 12 == 0:

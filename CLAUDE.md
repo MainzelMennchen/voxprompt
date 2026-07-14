@@ -328,10 +328,106 @@ iCloud-synchronisierten Ordner verschieben. `.venv`/Caches gehören ohnehin nie 
   `chflags nohidden .venv/lib/python3.12/site-packages/_editable_impl_voxprompt.pth`
   oder non-editable bauen mit `UV_NO_EDITABLE=1 uv sync`.
 
+## Per-Modus-LLMs + Prompt-Tuner-Integration (Stand 2026-07-12)
+
+Bereinigt und Prompt laufen über getrennte Modelle — in BEIDEN Backends:
+`[llm] cleanup_model`/`prompt_model` überschreiben `llm_model` pro Modus
+(leer = Default). Durchreichung: `app.py` `_mode_models` → `modes.process(
+model_override=…)` → `complete(model=…)`.
+
+**InProcess-Backend (Bundle) — Laden/Entladen statt Serverwechsel:** `InProcessLLM`
+hält immer genau EIN Modell im Speicher (`_loaded_id`); fordert `complete(model=…)`
+ein anderes an, wird entladen (`_unload`: Referenzen weg + `gc.collect()` +
+`mx.clear_cache()`) und das neue geladen. Moduswechsel kostet einmalig ~Ladezeit
+(gemessen 2–4 s aus warmem HF-Cache), RAM bleibt bei einem Modell. Bundle-Config:
+cleanup = Stock-`mlx-community/Qwen3.5-9B-MLX-4bit`, prompt =
+`MainzelMennchen/prompt-tuner-8b` (HF-Backup des Finetunes; MLX-4bit, von
+mlx_lm direkt ladbar). `models.py required_models()` zählt im inprocess-Backend
+auch cleanup_model/prompt_model (dedupliziert) → Onboarding-Download holt das
+Finetune beim ersten Start mit (~4,7 GB).
+
+**Logging-Gate:** Trainingspaare werden NUR geschrieben, wenn das Prompt-Modus-
+Modell exakt `[logging] training_source_model` ist (dev: `prompt-tuner-8b`,
+Bundle: `MainzelMennchen/prompt-tuner-8b`); leer = Logging aus. Outputs fremder
+Modelle landen nie im Trainingslog.
+
+**Modus 3 = Prompt-Optimierer (`prompt-tuner-8b`):** eigenes QLoRA-Finetune von
+Qwen3.5-9B (lokal in LM Studio unter `erik/prompt-tuner-8b`, HF-Backup
+`MainzelMennchen/prompt-tuner-8b`). `prompts/prompt_builder.md` enthält EXAKT das
+System-Prompt aus dem Training — **kein Zeichen ändern** (Test sichert das byte-genau
+ab). Request-Parameter aus dem Training: `prompt_temperature=0.2`,
+`prompt_max_tokens=800`, `prompt_timeout_seconds=30` (via `_mode_request_overrides`
+→ `request_overrides` → per-Request temperature/max_tokens/timeout in `complete()`).
+Thinking ist beim prompt-tuner im Chat-Template deaktiviert (Default OFF), keine
+Sonderparameter nötig.
+
+**Trainingsdaten-Logging (`datalog.py`):** nach jedem ERFOLGREICHEN Prompt-Modus-Call
+eine JSONL-Zeile an `[logging] training_log` (Default `~/voxprompt_data/log.jsonl`):
+`{ts, model: "prompt-tuner-8b-v2", raw, output, final: null}` — `ensure_ascii=False`,
+append-only, wirft nie (Fehler nur Konsole). Fallback-Fälle (LLM down → Rohtext)
+werden NICHT geloggt. `final` ist für manuell korrigierte Endfassungen reserviert
+(kein Editier-UI vorhanden → bleibt null).
+
+⚠️ **LM-Studio-Fallen (beide verifiziert):**
+1. **Stiller Modell-Fallback:** Bei unbekanntem `model`-Namen antwortet LM Studio
+   einfach mit dem gerade geladenen Modell — kein Fehler! Modellnamen müssen exakt
+   der ID aus `GET /v1/models` entsprechen (`prompt-tuner-8b`, nicht
+   `erik/prompt-tuner-8b`; `qwen3.5-9b-mtp`, nicht der HF-Repo-Name).
+2. **Thinking nicht per API abschaltbar:** Die aktuelle LM-Studio-Version ignoriert
+   `chat_template_kwargs.enable_thinking`, top-level `enable_thinking`,
+   `reasoning_effort` und `/no_think`. Stock-Qwen-GGUFs (qwen3.5-9b-mtp,
+   qwen3.6-27b-mtp) denken daher unkontrolliert → verbrennen `max_tokens`, leerer
+   content → LLMError. Cleanup auf qwen3.5-9b-mtp ist deshalb aktuell FUNKTIONAL
+   KAPUTT (Rohtext-Fallback greift), bis der Thinking-Default im LM-Studio-GUI
+   (Template-Edit: `is defined and` → `is not defined or`) umgestellt ist.
+   prompt-tuner-8b ist immun (Template-Default beim Finetune auf OFF gedreht).
+
+Verifiziert (2026-07-11): 53 pytest; E2E Prompt-Modus 6,5 s, strukturierter Prompt
+ohne Thinking-Block, Logzeile korrekt; Fallback (Port zu) → Rohtext, keine Logzeile.
+Verifiziert (2026-07-12): 55 pytest; Swap live (dev + aus dem Bundle): Cleanup auf
+Stock-9B 2,3 s → Modellwechsel → Prompt auf Finetune 3,9 s, kein Reload bei gleichem
+Modell, close() entlädt; Logging-Gate lässt nur das Finetune-Paar durch; App neu
+gebaut (602 MB) + DMG (186 MB, Mount-Test OK). DMG-Gotcha Nr. 2: bleibt ein
+rw.*.dmg-Staging-Image gemountet (Resource busy), erst `hdiutil detach` + Reste
+löschen, dann neu bauen.
+
+## Update-Hinweis (Option 1: melden, kein Self-Update) — Stand 2026-07-14
+
+Erste Stufe der Update-Strategie: die App prüft das neueste GitHub-Release und
+MELDET ein Update — sie ersetzt sich NICHT selbst (kein Sparkle, keine
+Signatur-Fallen). `updates.py`: `check_for_update(repo, current=__version__) ->
+UpdateInfo|None` fragt `GET /repos/{repo}/releases/latest` (httpx), vergleicht
+`tag_name` mit `__version__` (`is_newer`/`_parse_version`, semver-artig, '1.2' ==
+'1.2.0') und ignoriert Drafts/Prereleases. **Fehler-tolerant:** leeres repo, 404,
+Netz-/Parsefehler → None, wirft NIE (der Check darf das Diktieren nie stören).
+
+`app.py`: Menüpunkt „Auf Updates prüfen …" (nur wenn `[updates] repo` gesetzt);
+bei gefundenem Update wird der Titel zu „⬆︎ Update auf vX laden" und ein Klick
+öffnet die Release-Seite (`webbrowser.open`), sonst startet der Klick einen
+manuellen Check. Check läuft im Hintergrund-Thread (`_start_update_check` /
+`_check_updates`, `_update_checking`-Guard gegen Overlap), beim Start (`check_on_start`)
+und periodisch (`check_interval_hours`, 0 = nur Start/manuell; Intervall im
+`_refresh_ui`-Timer via `time.monotonic()`). Menü-Titel-Sync auf dem Main-Thread
+in `_sync_update_item`. Neue Notification bei gefundenem Update. `repo` muss dem
+echten GitHub-Repo entsprechen (`owner/name`); leer = kein Menüpunkt.
+
+Verifiziert (2026-07-14): 71 pytest (16 neu: is_newer-Matrix, MockTransport für
+neuer/gleich/älter/draft/prerelease/404/Netzfehler/kaputtes JSON/leeres repo) +
+Live-HTTP gegen echtes Repo (UpdateInfo mit realer Version+URL) und gegen das
+noch nicht existente Zielrepo (404 → None, kein Crash) + App konstruiert, Menü
+enthält den Punkt, Titel flippt bei pending Update und zurück. **Nächste Stufen:**
+Homebrew-Cask (Option 3) + Signier-/Notarisierungs-Pipeline (Phase-2-Schritt 7,
+Voraussetzung: jedes Update muss notarisiert sein); Sparkle (Option 2) später.
+
 ## Config-Felder (config.toml)
 
 - `[transcription] whisper_model`, `primary_language` ("de")
-- `[llm] llm_endpoint`, `llm_model`, `api_key`, `timeout_seconds`
+- `[llm] llm_endpoint`, `llm_model`, `api_key`, `timeout_seconds`, `max_tokens`,
+  `disable_thinking`, `cleanup_model`, `prompt_model`, `prompt_temperature`,
+  `prompt_max_tokens`, `prompt_timeout_seconds`, `manage_server`, `server_command`,
+  `server_startup_timeout`, `llm_backend`
 - `[modes] default_mode`
 - `[hotkeys] push_to_talk`, `mode_raw`/`mode_cleanup`/`mode_prompt`
 - `[output] auto_paste`
+- `[logging] training_log`, `training_log_model`, `training_source_model`
+- `[updates] repo`, `check_on_start`, `check_interval_hours`

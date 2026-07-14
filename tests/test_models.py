@@ -17,6 +17,27 @@ def test_required_models_ist_backend_abhaengig() -> None:
     assert models.required_models(ip) == {"Spracherkennung": "w", "Sprachmodell": "l"}
 
 
+def test_required_models_enthaelt_per_modus_modelle() -> None:
+    """inprocess: cleanup_model/prompt_model zählen mit, Duplikate nur einmal."""
+    cfg = {
+        "transcription": {"whisper_model": "w"},
+        "llm": {
+            "llm_backend": "inprocess",
+            "llm_model": "stock",
+            "cleanup_model": "stock",  # gleiches Repo wie Default -> kein Duplikat
+            "prompt_model": "tuner",
+        },
+    }
+    assert models.required_models(cfg) == {
+        "Spracherkennung": "w",
+        "Sprachmodell": "stock",
+        "Sprachmodell (Prompt)": "tuner",
+    }
+    # endpoint: per-Modus-Modelle hostet der Server, kein Download nötig.
+    cfg["llm"]["llm_backend"] = "endpoint"
+    assert models.required_models(cfg) == {"Spracherkennung": "w"}
+
+
 def test_is_cached_und_missing(monkeypatch) -> None:
     def fake_snapshot(repo, local_files_only=False, **kw):
         if repo == "present":
