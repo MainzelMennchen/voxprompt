@@ -1,5 +1,7 @@
 # voxprompt
 
+[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+
 Lokales Push-to-Talk-Diktiertool für macOS. Deutsch-primär mit englischem
 Code-Switching: lokale Spracherkennung (mlx-whisper) und lokale LLM-Nachbearbeitung
 in drei Modi — Roh / Bereinigt / Prompt-optimiert.
