@@ -190,6 +190,8 @@ Der gewählte Modus gilt für die nächste Aufnahme. Hotkeys sind in
 
 ## Lizenz
 
+© 2026 Erik ([github.com/MainzelMennchen](https://github.com/MainzelMennchen)).
+
 **CC BY-NC-ND 4.0** ([Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
 International](https://creativecommons.org/licenses/by-nc-nd/4.0/)) — siehe
 [LICENSE](LICENSE).
